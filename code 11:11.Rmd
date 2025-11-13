@@ -1,0 +1,104 @@
+---
+title: "Data Exploration"
+author: "The Great 8"
+date: "2025-11-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Our dataset is full of data about mortgage defaults. With this data we have to solve the problem for banks, or other mortgage lenders of who to trust with their money. This can benefit both the policyholder, with potential lower rates if they exude many signs of repayment, and also for the companies, as they will have a healthier portfolio, made of the safest people possible.
+
+## Step 1: Load Data 
+
+Since the data we found is already separated into a train set and a test set, we will load both datasets in separately. 
+
+```{r}
+train <- read.csv("application_train.csv", stringsAsFactors = TRUE)
+str(train)
+summary(train)
+```
+
+
+## Step 2: Data Cleaning 
+
+Eliminating columns that do not add a lot of additional information. 
+```{r}
+train$FLAG_OWN_CAR <- NULL
+train$FLAG_OWN_REALTY <- NULL
+train$FLAG_MOBIL <- NULL
+train$FLAG_CONT_MOBILE <- NULL
+train$FLAG_DOCUMENT_2 <- NULL
+train$FLAG_DOCUMENT_4 <- NULL
+train$FLAG_DOCUMENT_7 <- NULL
+train$FLAG_DOCUMENT_9 <- NULL
+train$FLAG_DOCUMENT_10 <- NULL
+train$FLAG_DOCUMENT_11 <- NULL
+train$FLAG_DOCUMENT_12 <- NULL
+train$FLAG_DOCUMENT_13 <- NULL
+train$FLAG_DOCUMENT_14 <- NULL
+train$FLAG_DOCUMENT_15 <- NULL
+train$FLAG_DOCUMENT_16 <- NULL
+train$FLAG_DOCUMENT_17 <- NULL
+train$FLAG_DOCUMENT_18 <- NULL
+train$FLAG_DOCUMENT_19 <- NULL
+train$FLAG_DOCUMENT_20 <- NULL
+train$FLAG_DOCUMENT_21 <- NULL
+train$SK_ID_CURR <- NULL
+```
+
+Filling in NA data with the mean of the column, created dummy variables, and scaled the data. 
+```{r}
+train[sapply(train, is.numeric)] <- lapply(train[sapply(train, is.numeric)], function(x) ifelse(is.na(x), mean(x, na.rm = TRUE), x))
+
+train_d <- as.data.frame(model.matrix(~ . -1, data = train))
+
+minmax<- function(x){
+  (x-min(x))/(max(x)-min(x))
+}
+
+train_s <- as.data.frame(lapply(train_d, minmax))
+```
+
+Split data 80/20 to create a train set and a test set. Due to the size of the dataset, 20% of test data will still be enough to help us test our model. 
+```{r}
+trainprop <- 0.8
+set.seed(12345)
+train_rows <- sample(1:nrow(train_s), trainprop*nrow(train_s))
+
+default_train <- train_s[train_rows, ]
+default_test <- train_s[-train_rows, ]
+```
+
+
+## Build Model 
+
+Creating a model using logistic regression.
+```{r}
+m1 <- glm(TARGET ~ ., data = default_train, family = "binomial")
+
+summary(m1)
+```
+
+## Predict 
+
+```{r}
+m1_pred <- predict(m1, default_test, type = "response")
+
+```
+
+## Evaluate Model 
+
+Confusion matrix to view accuracy and sensitivity. 
+Using a threshold of 0.05 give us decent sensitivity because the dataset itself is skewed heavily towards people not defaulting in the train data. We also infer that most people in the test data will not default either. 
+```{r}
+library(caret)
+m1_bin_pred <- ifelse(m1_pred >= 0.05, 1, 0)
+m1_matrix <- confusionMatrix(as.factor(m1_bin_pred), as.factor(default_test$TARGET), positive = "1")
+
+m1_matrix
+```
+
+
