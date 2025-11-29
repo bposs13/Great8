@@ -1,0 +1,49 @@
+## First Level Models - PR Curve and AUC
+
+Using the PR curves and their AUC, we can see the stability of different models balance of sensitivity and specificity throughout different thresholds.
+
+```{r}
+pos_label <- "1"
+
+labels <- as.numeric(as.character(churn_test$ChurnYes))
+
+log_pred <- as.numeric(log_pred)
+las_pred <- as.numeric(las_pred)
+knn_pred <- as.numeric(knn_pred)
+svm_pred <- as.numeric(svm_pred)
+dt_pred  <- as.numeric(dt_pred)
+rf_pred  <- as.numeric(rf_pred)
+ann_pred <- as.numeric(ann_pred)
+
+stopifnot(
+  length(labels) == length(log_pred),
+  length(labels) == length(las_pred),
+  length(labels) == length(knn_pred),
+  length(labels) == length(svm_pred),
+  length(labels) == length(dt_pred),
+  length(labels) == length(rf_pred),
+  length(labels) == length(ann_pred),
+)
+
+scores <- list(
+  Logistic = log_pred,
+  LASSO    = las_pred,
+  KNN      = knn_pred,
+  ANN      = ann_pred,
+  Tree     = dt_pred,
+  SVM      = svm_pred,
+  RF       = rf_pred
+)
+
+mmod <- mmdata(scores, labels, modnames = names(scores), posclass = 1)
+eval <- evalmod(mmod)
+autoplot(eval)
+
+cat("Because the target variable is quite sparse, our best model will be based off of PR AUC, and not ROC AUC\n")
+pr_table <- subset(eval$aucs, curvetypes == "PRC")
+max_auc <- max(pr_table$aucs)
+max_model <- pr_table$modnames[ which.max(pr_table$aucs) ]
+best_pr <- pr_table[ which.max(pr_table$aucs), ]
+best_pr
+```
+

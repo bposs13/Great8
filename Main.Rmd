@@ -1,0 +1,40 @@
+---
+title: "Project 2: Introduction"
+author: "The Great 8"
+date: "`r format(Sys.Date())`"
+output: 
+  html_document:
+    code_folding: hide
+    theme: cerulean
+    toc: true
+    toc_float: true
+    
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(caret)
+library(glmnet)
+library(class)
+library(neuralnet)
+library(C50)
+library(randomForest)
+library(kernlab)
+library(precrec)
+```
+
+## Introduction
+
+Our dataset is full of data about mortgage defaults. With this data we have to solve the problem for banks, or other mortgage lenders of who to trust with their money. This can benefit both the policyholder, with potential lower rates if they exude many signs of repayment, and also for the companies, as they will have a healthier portfolio, made of the safest people possible.
+
+```{r child="Data Cleaning.Rmd"}
+```
+
+```{r child="First Level Models.Rmd"}
+```
+
+```{r child="PR AUC.Rmd"}
+```
+
+
+

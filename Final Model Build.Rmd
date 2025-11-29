@@ -1,0 +1,36 @@
+## Final Model Build
+
+We use our predictions from all of our previoud models to form a final, "Model of Models." Hopefully, this contains better predictive power than any individual model. To accomplish this, we use a 70/30 split on our current test set.
+
+```{r}
+cat("First, we split our current test data in train and testsplit at 70/30\n")
+final_preds <- data.frame(TARGET = default_test$TARGET, log_pred, las_pred, knn_pred, ann_pred, dt_pred, rf_pred, svm_pred)
+
+train_split <- .70
+set.seed(12345)
+train_rows <- sample(1:nrow(final_preds), nrow(final_preds) * train_split)
+
+final_train <- final_preds[train_rows,]
+final_test <- final_preds[-train_rows,]
+
+summary(final_train)
+summary(final_test)
+cat("All of our models have similar means to the test data, which a good preliminary sign of their predicitve power!\n")
+
+final_tree <- C5.0(as.factor(TARGET) ~ ., data = final_train, trials = 100, control = C5.0Control(minCases = 1, winnow = TRUE))
+final_pred <- predict(final_tree, final_test)
+final_cm <- confusionMatrix(as.factor(final_pred), as.factor(final_test$TARGET), positive = "1")
+final_cm
+cat("With a sensitivity of", final_cm$byClass["Sensitivity"], "and specificity of", final_cm$byClass["Specificity"], "we see fairly decent performance, but this may be improved with a cost matrix\n")
+
+cost_matrix <- matrix(c(0, 1, 3, 0), nrow = 2)
+cost_matrix
+final_tree2 <- C5.0(as.factor(TARGET) ~ ., data = final_train, costs = cost_matrix)
+plot(final_tree2)
+final_pred2 <- predict(final_tree2, final_test)
+final_cm2 <- confusionMatrix(as.factor(final_pred2), as.factor(final_test$TARGET), positive = "1")
+final_cm2
+
+cat("Because our cost matrix model performs better considering our 3:1::Sens:Spec ratio, we use that model going forward\n")
+```
+

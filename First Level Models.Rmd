@@ -1,0 +1,302 @@
+## Build First Level Models 
+
+In our analysis, we will use the PR's AUC to choose our best performing models. This will capture the best relationship between sensitivity and specificity.
+
+### Logistic Regression
+
+Creating a model using logistic regression. We will use both forward stepwise and lasso regression, in hopes of finding a simpler model, as we are currently working with over 200 variables. Then, we will do some preliminary analysis testing a few thresholds, seeing which model performs better. But, the full breakdown of first level models will come at the end of this section.
+
+```{r}
+set.seed(12345)
+m1 <- step(glm(TARGET ~ ., data = default_train, family = "binomial"), direction = "forward")
+summary(m1)
+
+cat("Make predictions using Forward stepwise model\n")
+default_pred_log <- predict(m1, default_test, type = "response")
+default_pred_log1 <- ifelse(default_pred_log >= .5, 1, 0)
+cm_log <- confusionMatrix(as.factor(default_pred_log1), as.factor(default_test$TARGET), positive = "1")
+cm_log
+cm_log$byClass["Sensitivity"]
+cat("Even with a baseline threshold of .5, we see a poor sensitivity of", cm_log$byClass["Sensitivity"],"but, we will try lowering the threshold\n")
+
+default_pred_log2 <- ifelse(default_pred_log >= .05, 1, 0)
+cm_log2 <- confusionMatrix(as.factor(default_pred_log2), as.factor(default_test$TARGET), positive = "1")
+cm_log2
+cm_log2$byClass["Sensitivity"]
+
+cat("We also try using a lasso model, this is a different way of performing model selection. We can observe which performs better\n")
+x <- model.matrix(TARGET ~ ., data = default_train)[, -1]
+x_t <- model.matrix(TARGET ~ ., data = default_test)[, -1]
+y <- default_train$TARGET
+lasso <- cv.glmnet(x, y, family = "binomial", alpha = 1, nfolds = 10)
+summary(lasso)
+lasso
+def_pred_logL <- predict(lasso, newx = x_t, s = "lambda.min", type = "response")
+def_pred_log_L <- ifelse(def_pred_logL >= .5, 1, 0)
+cm_logL <- confusionMatrix(as.factor(def_pred_log_L), as.factor(default_test$TARGET), positive = "1")
+cm_logL
+cm_logL$byClass["Sensitivity"]
+cat("Again, with a baseline threshold of .5, we see a poor sensitivity of", cm_log$byClass["Sensitivity"],"but, we will try lowering the threshold\n")
+
+def_pred_log_L <- ifelse(def_pred_logL >= .05, 1, 0)
+cm_logL <- confusionMatrix(as.factor(def_pred_log_L), as.factor(default_test$TARGET), positive = "1")
+cm_logL
+cm_logL$byClass["Sensitivity"]
+
+log_pred <- default_pred_log
+las_pred <- def_pred_logL[, 1]
+```
+
+### KNN
+
+In this model, we will try many different values of K, hopefully achieving a good balance of over and underfitting. This will be done through cross validation of our k value, based on the balancing criteria of $3 * \text{Sensitivity} + \text{Specificity}$. 
+
+```{r}
+cat("Next, we will test a sequence of k values, to try and find the optimal value\n")
+s <- seq(from = 11, to = round(sqrt(nrow(default_train))) + 1, by = 2)
+results <- data.frame(k = s, total = NA)
+folds <- createFolds(default_train[,1], k = 10, returnTrain = TRUE)
+
+for (i in seq_along(s)) {
+  kv <- s[i]
+  fold_scores <- c()
+  
+  for (f in seq_along(folds)) {
+    train_idx <- folds[[f]]
+    valid_idx <- setdiff(seq_len(nrow(default_train)), train_idx)
+    
+    trainX <- default_train[train_idx, -1]
+    trainY <- default_train[train_idx, 1]
+    
+    validX <- default_train[valid_idx, -1]
+    validY <- default_train[valid_idx, 1]
+    
+    pred <- knn(train = trainX, test = validX, cl = trainY, k = kv)
+    
+    cm <- confusionMatrix(as.factor(pred), as.factor(validY), positive = "1")
+    
+    sens <- cm$byClass["Sensitivity"]
+    spec <- cm$byClass["Specificity"]
+    
+    fold_scores[f] <- 3 * sens + 1 * spec
+  }
+    results$total[i] <- mean(fold_scores)
+}
+best_k <- results$k[which.max(results$total)]
+best_k
+plot(s, results$total, type = "l", xlab = "K-value", ylab = "3 * Sens + 1 * Spec", main = "Score vs K-value")
+abline(v = best_k, col = "red", lwd = 2)
+
+default_pred_best <- knn(train = default_train[, -1], test = default_test[, -1], cl = default_train[, 1], k = best_k, prob = TRUE)
+cm_knn <- confusionMatrix(as.factor(default_pred_best), as.factor(default_test[,1]), positive = "1")
+cm_knn
+cm_knn$byClass["Sensitivity"]
+cm_knn$byClass["Specificity"]
+cat("As seen in the output, our best KNN model uses k =", best_k, "and has a sensitivity of", cm_knn$byClass["Sensitivity"], "with a specificity of", cm_knn$byClass["Sensitivity"], "\n")
+
+knn_pred <- attr(default_pred_best, "prob")
+```
+
+### SVM
+
+In finding our best SVM model, we will again use the criteria of $3 * \text{Sensitivity} + \text{Specificity}$. Then, based upon this, choose our best SVM Kernel to use for our PR AUC cTARGETulation.
+
+```{r}
+cat("We try many of the SVM kernels, seeing which works best with our data\n")
+
+score <- c()
+cat("Linear\n")
+svm1 <- ksvm(as.factor(TARGET) ~ ., data = default_train, kernel = "vanilladot")
+svmp <- predict(svm1, default_test)
+
+cm_svm <- confusionMatrix(svmp, as.factor(default_test$TARGET), positive = "1")
+score <- c(score, (cm_svm$byClass["Sensitivity"] * 3 + cm_svm$byClass["Specificity"]) )
+
+cat("RBF\n")
+svm1 <- ksvm(as.factor(TARGET) ~ ., data = default_train, kernel = "rbfdot")
+svmp <- predict(svm1, default_test)
+
+cm_svm <- confusionMatrix(svmp, as.factor(default_test$TARGET), positive = "1")
+score <- c(score, (cm_svm$byClass["Sensitivity"] * 3 + cm_svm$byClass["Specificity"]) )
+
+cat("Polynomial\n")
+svm1 <- ksvm(as.factor(TARGET) ~ ., data = default_train, kernel = "polydot")
+svmp <- predict(svm1, default_test)
+
+cm_svm <- confusionMatrix(svmp, as.factor(default_test$TARGET), positive = "1")
+score <- c(score, (cm_svm$byClass["Sensitivity"] * 3 + cm_svm$byClass["Specificity"]) )
+
+cat("Hyperbolic Tangent\n")
+svm1 <- ksvm(as.factor(TARGET) ~ ., data = default_train, kernel = "tanhdot")
+svmp <- predict(svm1, default_test)
+
+cm_svm <- confusionMatrix(svmp, as.factor(default_test$TARGET), positive = "1")
+score <- c(score, (cm_svm$byClass["Sensitivity"] * 3 + cm_svm$byClass["Specificity"]) )
+
+cat("Bessel\n")
+svm1 <- ksvm(as.factor(TARGET) ~ ., data = default_train, kernel = "besseldot")
+svmp <- predict(svm1, default_test)
+
+cm_svm <- confusionMatrix(svmp, as.factor(default_test$TARGET), positive = "1")
+score <- c(score, (cm_svm$byClass["Sensitivity"] * 3 + cm_svm$byClass["Specificity"]) )
+
+cat("ANOVA\n")
+svm1 <- ksvm(as.factor(TARGET) ~ ., data = default_train, kernel = "anovadot")
+svmp <- predict(svm1, default_test)
+
+cm_svm <- confusionMatrix(svmp, as.factor(default_test$TARGET), positive = "1")
+score <- c(score, (cm_svm$byClass["Sensitivity"] * 3 + cm_svm$byClass["Specificity"]) )
+
+cat("Spline\n")
+svm1 <- ksvm(as.factor(TARGET) ~ ., data = default_train, kernel = "splinedot")
+svmp <- predict(svm1, default_test)
+
+cm_svm <- confusionMatrix(svmp, as.factor(default_test$TARGET), positive = "1")
+score <- c(score, (cm_svm$byClass["Sensitivity"] * 3 + cm_svm$byClass["Specificity"]) )
+
+best_index <- which.max(sens)
+kern <- c("vanilladot", "rbfdot", "polydot", "tanhdot", "besseldot", "anovadot", "splinedot")[best_index]
+
+svm_final <- ksvm(as.factor(TARGET) ~ ., data = default_train, kernel = kern, prob.model = TRUE)
+svmp <- predict(svm_final, default_test)
+cm_svm <- confusionMatrix(svmp, as.factor(default_test$TARGET), positive = "1")
+cm_svm
+cm_svm$byClass["Sensitivity"]
+cm_svm$byClass["Specificity"]
+cat("Our best model uses the kernel", kern, "and has sensitivity", cm_svm$byClass["Sensitivity"], "with specificity of", cm_svm$byClass["Specificity"], "\n")
+
+svm_pred <- predict(svm_final, newdata = default_test, type = "probabilities")[, 2]
+```
+
+### Decision Tree
+
+We will prune our hyperparameter, trials, using cross-validation.
+
+```{r}
+cat("We try different values for trial to find the best model\n")
+trials <- c(1, 5, 10, 20, 30, 50)
+results <- data.frame(k = trials, total = NA)
+for (i in seq_along(trials)) {
+  t = trials[i]
+  model <- C5.0(as.factor(TARGET) ~ ., data = default_train, trials = t)
+  pred <- predict(model, default_test)
+  cm <- confusionMatrix(as.factor(pred), as.factor(default_test$TARGET), positive = "1")
+  
+  results$total[i] <- cm$byClass['Sensitivity'] * 3 + cm$byClass["Specificity"]
+}
+best_t <- results$k[which.max(results$total)]
+
+best_tree <- C5.0(as.factor(TARGET) ~ ., data = default_train, trials = best_t)
+plot(best_tree)
+plot(s, results$total, type = "l", xlab = "Trials", ylab = "3 * Sens + 1 * Spec", main = "Score vs Trials")
+abline(v = best_t, col = "red", lwd = 2)
+tree_pred <- predict(best_tree, default_test)
+cm_tree <- confusionMatrix(as.factor(tree_pred), as.factor(default_test$TARGET), positive = "1")
+cm_tree
+cm_tree$byClass["Sensitivity"]
+cm_tree$byClass["Specificity"]
+
+cat("As seen in the output, our best Decision Tree model uses trials =", best_t, "and has a sensitivity of", cm_tree$byClass["Sensitivity"], "and a specificity of", cm_tree$byClass["Specificity"], "\n")
+
+dt_pred <- predict(best_tree, default_test, type = "prob")[, "1"]
+```
+
+### Random Forest
+
+Similarly to the random forest, we will perform cross-validation to find our value of ntrees.
+
+```{r}
+cat("Similar to the decision tree, will will try and tune a hyperparameter the number of trees\n")
+trees <- seq(from = 100, to = 1500, by = 100)
+results <- data.frame(k = trees, total = NA)
+for (i in seq_along(trees)) {
+  t = trees[i]
+  model <- randomForest(as.factor(TARGET) ~ ., data = default_train, ntree = i)
+  pred <- predict(model, default_test)
+  cm <- confusionMatrix(as.factor(pred), as.factor(default_test$TARGET), positive = "1")
+  
+  results$total[i] <- cm$byClass['Sensitivity'] * 3 + cm$byClass["Specificity"]
+  
+}
+best_tree <- results$k[which.max(results$total)]
+
+best_rf <- randomForest(as.factor(TARGET) ~ ., data = default_train, n_tree = best_tree, importance = TRUE)
+plot(best_rf)
+plot(s, results$total, type = "l", xlab = "ntrees", ylab = "3 * Sens + 1 * Spec", main = "Score vs ntrees")
+abline(v = best_tree, col = "red", lwd = 2)
+tree_pred <- predict(best_rf, default_test)
+cm_rf <- confusionMatrix(as.factor(tree_pred), as.factor(default_test$TARGET), positive = "1")
+cm_rf
+cm_rf$byClass["Sensitivity"]
+cm_rf$byClass["Specificity"]
+cat("As seen in the output, our best Random Forest model uses trials =", best_tree, "and has a sensitivity of", cm_rf$byClass["Sensitivity"], "with a specificity of", cm_rf$byClass["Specificity"], "\n")
+cat("Variable importance plot, showing which variables contribute most to meaningful splits in our Random Forest\n")
+vip <- varImpPlot(best_rf)
+most_imp <- rownames(vip)[which.max(vip[, "MeanDecreaseGini"])]
+least_imp <- rownames(vip)[which.min(vip[, "MeanDecreaseGini"])]
+cat("By mean gini decrease, the most important variable is", most_imp, "and least important is", least_imp, "\n" )
+rf_pred <- predict(best_rf, default_test, type = "prob")[, "1"]
+```
+
+### ANN
+
+Finally, we use two ANN models, one with hidden layers, and one without.
+
+```{r}
+cat("To start, we will create 3 ANN models, each with different hidden layers, and use our model with the best predictive power moving forward\n")
+cat("First, no hidden layers\n")
+
+score <- c()
+
+set.seed(12345)
+ann0 <- neuralnet(TARGET ~ ., data = default_train, hidden = 0, linear.output = FALSE, lifesign = "full", stepmax = 100000, threshold = 0.0001)
+
+ann_results0 <- compute(ann0, default_test[, -which(names(default_test) == "TARGET")])
+default_pred_ann0 <- ann_results0$net.result
+default_bin_pred_ann0 <- ifelse(default_pred_ann0 >= .50, 0, 1)
+cm_ann0 <- confusionMatrix(as.factor(default_bin_pred_ann0), as.factor(default_test$TARGET), positive = "1")
+cm_ann0
+
+score <- c(score, (cm_ann0$byClass["Sensitivity"] * 3 + cm_ann0$byClass["Specificity"]))
+
+cat("Next, one hidden layer\n")
+set.seed(12345)
+ann1 <- neuralnet(TARGET ~ ., data = default_train, hidden = 1, linear.output = FALSE, lifesign = "full", stepmax = 500000, threshold = 0.0001)
+
+ann_results1 <- compute(ann1, default_test[, -which(names(default_test) == "TARGET")])
+default_pred_ann1 <- ann_results1$net.result
+default_bin_pred_ann1 <- ifelse(default_pred_ann1 >= .50, 0, 1)
+cm_ann1 <- confusionMatrix(as.factor(default_bin_pred_ann1), as.factor(default_test$TARGET), positive = "1")
+cm_ann1
+
+score <- c(score, (cm_ann1$byClass["Sensitivity"] * 3 + cm_ann1$byClass["Specificity"]))
+cms <- list(cm_ann0, cm_ann1)
+best_model_idx <- as.numeric(which.max(score))
+best_model <- get(paste0("ann", best_model_idx))
+best_cm <- get(paste0("cm_ann", best_model_idx))
+cat("ANN 1 is the no hidden layer, ANN 2 is one hidden layer\n")
+cat("Best model: ANN", best_model_idx, "with sensitivity:", cms[[best_model_idx]]$byClass["Sensitivity"], "and specificty", cms[[best_model_idx]]$byClass["Specificity"], "\n")
+cm_ann <- cms[[best_model_idx]]
+cm_ann
+ann_best <- data.frame(default_pred_ann0, default_pred_ann1)
+
+cat("Now we optimize our best ANN\n")
+s <- seq(from = .2, to = .8, by = .01)
+results <- data.frame(k = s, total = NA)
+for (i in seq_along(s)) {
+  ann_p <- ifelse(ann_best[best_model_idx] >= s[i], 1, 0)
+  cm <- confusionMatrix(as.factor(ann_p), as.factor(default_test$TARGET), positive = "1")
+  
+  results$total[i] <- cm$byClass['Specificity'] * 1 + cm$byClass['Sensitivity'] * 3
+}
+best_thresh <- results$k[which.max(results$total)]
+plot(s, results$total, type = "l", xlab = "Threshold", ylab = "3 * Sens + 1 * Spec", main = "Score vs Threshold")
+abline(v = best_thresh, col = "red", lwd = 2)
+ann_pred1 <- ifelse(ann_best[best_model_idx] >= best_thresh, 1, 0)
+cm_ann <- confusionMatrix(as.factor(ann_pred1), as.factor(default_test$TARGET), positive = "1")
+cm_ann
+cm_ann$byClass["Sensitivity"]
+cm_ann$byClass["Specificity"]
+cat("Our best balance of spec/sens using our ANN model was with threshold", best_thresh, "where we achieved a sensitivity of", cm_ann$byClass["Sensitivity"], "and a specificity of", cm_ann$byClass["Specificity"], "\n")
+ann_pred <- ann_best[, best_model_idx]
+```
