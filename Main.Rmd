@@ -29,7 +29,9 @@ library(nnet)
 
 ## Introduction
 
-Our dataset is full of data about mortgage defaults. With this data we have to solve the problem for banks, or other mortgage lenders of who to trust with their money. This can benefit both the policyholder, with potential lower rates if they exude many signs of repayment, and also for the companies, as they will have a healthier portfolio, made of the safest people possible.
+When banks lend money to individuals, and they end up not being able to pay back their debt, the banks may end up taking a loss. In order to mitigate those losses and ensure profitability, it is important that banks know which borrowers are more likely to successfully pay back the money they owe when they take out a mortgage and who is more likely to default. 
+
+The data we used for our models contains 100+ variables, such as income, education, family status, and housing type, for each individual who has taken out a mortgage. Using the variables as predictors, we aim to build a model that predicts whether or not a borrower is going to pay back their mortgage. This model can then be used by banks or other mortgage lenders to help them decide who they can trust with their money, allowing them to build a healthier portfolio and minimize the risk of financial loss. This predictive model can also be beneficial to the borrowers, as the banks can decide to offer better terms, such as lower interest rates or reduced down payment, to individuals who exhibit multiple signs of mortgage repayment.  
 
 ```{r child="Data Cleaning.Rmd"}
 ```
