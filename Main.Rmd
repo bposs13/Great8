@@ -21,6 +21,10 @@ library(C50)
 library(randomForest)
 library(kernlab)
 library(precrec)
+library(tidymodels)
+library(themis)
+library(stats)
+library(nnet)
 ```
 
 ## Introduction
@@ -34,6 +38,12 @@ Our dataset is full of data about mortgage defaults. With this data we have to s
 ```
 
 ```{r child="PR AUC.Rmd"}
+```
+
+```{r child="Final Model Build.Rmd}
+```
+
+```{r child="Profit Evaluation"}
 ```
 
 

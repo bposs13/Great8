@@ -1,11 +1,11 @@
-## First Level Models - PR Curve and AUC
+## First Level Models - ROC, PR Curves and AUC
 
-Using the PR curves and their AUC, we can see the stability of different models balance of sensitivity and specificity throughout different thresholds.
+Using the PR curves and their AUC, we can see the stability of different models balance of sensitivity and specificity throughout different thresholds. Because our TARGET class is very unbalanced, we should value the PR's AUC to find our best initial model. 
 
 ```{r}
 pos_label <- "1"
 
-labels <- as.numeric(as.character(churn_test$ChurnYes))
+labels <- as.numeric(as.character(test_processed$TARGET))
 
 log_pred <- as.numeric(log_pred)
 las_pred <- as.numeric(las_pred)
@@ -22,7 +22,7 @@ stopifnot(
   length(labels) == length(svm_pred),
   length(labels) == length(dt_pred),
   length(labels) == length(rf_pred),
-  length(labels) == length(ann_pred),
+  length(labels) == length(ann_pred)
 )
 
 scores <- list(
@@ -40,10 +40,6 @@ eval <- evalmod(mmod)
 autoplot(eval)
 
 cat("Because the target variable is quite sparse, our best model will be based off of PR AUC, and not ROC AUC\n")
-pr_table <- subset(eval$aucs, curvetypes == "PRC")
-max_auc <- max(pr_table$aucs)
-max_model <- pr_table$modnames[ which.max(pr_table$aucs) ]
-best_pr <- pr_table[ which.max(pr_table$aucs), ]
-best_pr
+cat("As seen from the plot, Logistic and LASSO seem to be the highest performing models.\n")
 ```
 

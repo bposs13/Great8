@@ -1,15 +1,14 @@
 ## Read in Our Data
 
-We first load in the dataset from Kaggle, the train.csv file. By nature of this data, we only will use the train set for our analysis, and for sake of computational power, we only use 100000 rows of the over 300000 available. Otherwise, our models would take far too long to fit. This allows us to still have sufficient data in both our first and second level, train and test sets alike.
+We first load in the dataset from Kaggle, the train.csv file. By nature of this data, we only will use the train set for our analysis, and for sake of computational power, we only use 10000 rows of the over 300000 available. Otherwise, our models would take far too long to fit. This allows us to still have sufficient data in both our first and second level, train and test sets alike.
 ```{r}
 mortgage <- read.csv("application_train.csv", stringsAsFactors = TRUE)
-set.seed(12345)
-rows <- sample(1:nrow(mortgage), 100000)
 
+set.seed(12345)
+rows <- sample(1:nrow(mortgage), 10000)
 dat <- mortgage[rows, ]
 
-str(dat)
-summary(dat)
+dat$TARGET <- factor(dat$TARGET)
 ```
 
 ## Clean Data
@@ -17,63 +16,59 @@ summary(dat)
 Eliminating columns that do not add a lot of additional information. We found these through our initial data exploration on Kaggle. These variables are almost all missing, which makes it very difficult to use them in the model-building process.
 
 ```{r}
-dat$FLAG_OWN_CAR <- NULL
-dat$FLAG_OWN_REALTY <- NULL
-dat$FLAG_MOBIL <- NULL
-dat$FLAG_CONT_MOBILE <- NULL
-dat$FLAG_DOCUMENT_2 <- NULL
-dat$FLAG_DOCUMENT_4 <- NULL
-dat$FLAG_DOCUMENT_7 <- NULL
-dat$FLAG_DOCUMENT_9 <- NULL
-dat$FLAG_DOCUMENT_10 <- NULL
-dat$FLAG_DOCUMENT_11 <- NULL
-dat$FLAG_DOCUMENT_12 <- NULL
-dat$FLAG_DOCUMENT_13 <- NULL
-dat$FLAG_DOCUMENT_14 <- NULL
-dat$FLAG_DOCUMENT_15 <- NULL
-dat$FLAG_DOCUMENT_16 <- NULL
-dat$FLAG_DOCUMENT_17 <- NULL
-dat$FLAG_DOCUMENT_18 <- NULL
-dat$FLAG_DOCUMENT_19 <- NULL
-dat$FLAG_DOCUMENT_20 <- NULL
-dat$FLAG_DOCUMENT_21 <- NULL
-dat$SK_ID_CURR <- NULL
+drop_cols <- c("FLAG_OWN_CAR","FLAG_OWN_REALTY","FLAG_MOBIL","FLAG_CONT_MOBILE",
+               "FLAG_DOCUMENT_2","FLAG_DOCUMENT_4","FLAG_DOCUMENT_7","FLAG_DOCUMENT_9",
+               "FLAG_DOCUMENT_10","FLAG_DOCUMENT_11","FLAG_DOCUMENT_12","FLAG_DOCUMENT_13",
+               "FLAG_DOCUMENT_14","FLAG_DOCUMENT_15","FLAG_DOCUMENT_16","FLAG_DOCUMENT_17",
+               "FLAG_DOCUMENT_18","FLAG_DOCUMENT_19","FLAG_DOCUMENT_20","FLAG_DOCUMENT_21",
+               "SK_ID_CURR")
+
+drop_cols <- drop_cols[drop_cols %in% names(dat)]
+dat <- dat[, setdiff(names(dat), drop_cols)]
 ```
 
-Filling in NA data with the mean of the column, created dummy variables, and scaled the data. We also remove any columns which do not have unique values, otherwise some of our models will not be able to run. This is due to the singular columns made in a matrix during computation. 
+Filling in NA data with the mean of the column, created dummy variables, and scaled the data. We also remove any columns which do not have unique values, otherwise some of our models will not be able to run. This is due to the singular columns made in a matrix during computation. Also, we oversample as our target variable is severely underrepresented and will not factor into the model building if not. Split data 50/50 initially to create a train set and a test set. Further down the line, we will split this test data into train and test again, for our second layer model. With 100000 rows, we will have adequate amounts of data in all levels of our model. Now, with usingn oversampling we make separate SMOTE dfs for all of our models except logistic regression, which uses the unchanged dataframe.
 
-```{r}
-dat[sapply(dat, is.numeric)] <- lapply(dat[sapply(dat, is.numeric)], function(x) ifelse(is.na(x), mean(x, na.rm = TRUE), x))
-
-dat_d <- as.data.frame(model.matrix(~ . -1, data = dat))
-
-minmax<- function(x){
-  (x-min(x))/(max(x)-min(x))
-}
-
-dat_s <- as.data.frame(lapply(dat_d, minmax))
-
-colSums(is.na(dat_s))
-sapply(dat_s, function(x) length(unique(x)))
-dat_s <- dat_s[ , sapply(dat_s, function(x) length(unique(x)) > 1) ]
-
-```
-
-Split data 50/50 initially to create a train set and a test set. Further down the line, we will split this test data into train and test again, for our second layer model. With 100000 rows, we will have adequate amounts of data in all levels of our model.
 ```{r}
 trainprop <- 0.5
 set.seed(12345)
-train_rows <- sample(1:nrow(dat_s), trainprop*nrow(dat_s))
+train_idx <- sample(seq_len(nrow(dat)), size = floor(trainprop * nrow(dat)))
+train_raw <- dat[train_idx, ]
+test_raw  <- dat[-train_idx, ]
 
-default_train <- dat_s[train_rows, ]
-default_test <- dat_s[-train_rows, ]
+cat("Rows: train =", nrow(train_raw), " test =", nrow(test_raw), "\n")
+cat("Original TARGET distribution (population):\n"); print(table(dat$TARGET))
+cat("Train raw TARGET distribution:\n"); print(table(train_raw$TARGET))
+cat("Test raw TARGET distribution:\n"); print(table(test_raw$TARGET))
 
-cat("Train\n")
-summary(default_train$TARGET)
-cat("Test\n")
-summary(default_test$TARGET)
-cat("Population\n")
-summary(dat_s$TARGET)
+base_rec <- recipe(TARGET ~ ., data = train_raw) %>%
+  step_impute_median(all_numeric_predictors()) %>%
+  step_impute_mode(all_nominal_predictors()) %>%
+  step_dummy(all_nominal_predictors(), one_hot = TRUE) %>%
+  step_zv(all_predictors()) %>%
+  step_normalize(all_numeric_predictors())
 
-cat("We see that the means are all similar, showing our splits are representative of the population/n")
+prep_base <- prep(base_rec, training = train_raw, retain = TRUE)
+
+train_base <- bake(prep_base, new_data = NULL)
+test_processed <- bake(prep_base, new_data = test_raw)
+
+cat("Processed train dims:", dim(train_base), "\n")
+cat("Processed test dims :", dim(test_processed), "\n")
+cat("Processed train TARGET distribution:\n"); print(table(train_base$TARGET))
+
+smote_rec <- recipe(TARGET ~ ., data = train_base) %>%
+  step_smote(TARGET)
+
+prep_smote <- prep(smote_rec, training = train_base, retain = TRUE)
+train_smote <- bake(prep_smote, new_data = NULL)
+
+cat("After SMOTE - TARGET distribution:\n"); print(table(train_smote$TARGET))
+
+set.seed(12345) 
+train_idx <- sample(seq_len(nrow(train_smote)), 5000)
+smote_train <- train_smote[train_idx, ]
+
+cat("train_base rows:", nrow(train_base), "train_smote rows:", nrow(train_smote), "\n")
+
 ```

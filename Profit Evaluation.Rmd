@@ -1,0 +1,44 @@
+Now in our profit evaluation we need to interpret the costs of each of these events happening. In using our models, we would not pursue a customer if we see that our model predicts them to default, and will if the model says they will not. This way, we have a binary structure, and can calculate profits.
+
+We know that False Negatives will be very expensive, we will lose a lot of money on a default. Consequently, correctly finding a default will effectively "earn" us most of the money we would have lost. For a false positive, we assign a slightly lower negative weight, as there is a lost opportunity for money, an opportunity cost. Then, for correctly finding a non-defaulter, we some earn money, but less than the amount we lost out on by not writing a mortgage in the false positive case.
+
+In this profit evaluation, we use the following:
+- \$125,000 for a true positive
+- -\$150,000 for a false negative
+- \$5,000 for a true negative
+- -\$10,000 for a false positive
+
+```{r}
+profit <- c()
+people <- 1000
+final_prof <- people * (final_cm2$table[2, 2] * 125000 - final_cm2$table[1, 2] * 150000 - final_cm2$table[2, 1] * 10000 + final_cm2$table[1, 1] * 5000) / sum(final_cm2$table)
+log_prof <- people * (cm_log$table[2, 2] * 125000 - cm_log$table[1, 2] * 150000 - cm_log$table[2, 1] * 10000 + cm_log$table[1, 1] * 5000) / sum(cm_log$table)
+las_prof <- people * (cm_logL$table[2, 2] * 125000 - cm_logL$table[1, 2] * 150000 - cm_logL$table[2, 1] * 10000 + cm_logL$table[1, 1] * 5000) / sum(cm_logL$table)
+knn_prof <- people * (cm_knn$table[2, 2] * 125000 - cm_knn$table[1, 2] * 150000 - cm_knn$table[2, 1] * 10000 + cm_knn$table[1, 1] * 5000) / sum(cm_knn$table)
+ann_prof <- people * (cm_ann$table[2, 2] * 125000 - cm_ann$table[1, 2] * 150000 - cm_ann$table[2, 1] * 10000 + cm_ann$table[1, 1] * 5000) / sum(cm_ann$table)
+dt_prof <- people * (cm_tree$table[2, 2] * 125000 - cm_tree$table[1, 2] * 150000 - cm_tree$table[2, 1] * 10000 + cm_tree$table[1, 1] * 5000) / sum(cm_tree$table)
+rf_prof <- people * (cm_rf$table[2, 2] * 125000 - cm_rf$table[1, 2] * 150000 - cm_rf$table[2, 1] * 10000 + cm_rf$table[1, 1] * 5000) / sum(cm_rf$table)
+svm_prof <- people * (cm_svm$table[2, 2] * 125000 - cm_svm$table[1, 2] * 150000 - cm_svm$table[2, 1] * 10000 + cm_svm$table[1, 1] * 5000) / sum(cm_svm$table)
+profit <- c(final_prof, log_prof, las_prof, knn_prof, ann_prof, dt_prof, rf_prof, svm_prof)
+names <- c("Final", "Logistic", "LASSO", "KNN", "ANN", "DT", "RF", "SVM")
+names(profit) <- names 
+
+profit <- sort(profit, decreasing = TRUE)
+profit
+colors <- c("darkgreen", "forestgreen", "seagreen", "springgreen", "orange","orangered2", "red" , "darkred")
+bp <- barplot(profit,
+        main = "Model Profits",
+        ylab = "Profit",
+        xlab = "Model",
+        col = colors,
+        ylim = c(min(profit) * 1.1, max(profit) * 1.35))
+
+text(
+  x = bp,                 
+  y = profit,           
+  labels = round(profit), 
+  pos = 3, )
+
+cat("We see the highest profit of", max(profit), "in our", names(which.max(profit)), "model, and would look to implement this model moving forward\n")
+```
+
