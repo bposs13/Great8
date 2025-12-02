@@ -27,10 +27,22 @@ cm_log
 cm_log$byClass["Sensitivity"]
 cat("Even with a baseline threshold of .5, we see a poor sensitivity of", cm_log$byClass["Sensitivity"],"but, we will try lowering the threshold\n")
 
-default_pred_log2 <- ifelse(default_pred_log >= .05, 1, 0)
-cm_log2 <- confusionMatrix(as.factor(default_pred_log2), as.factor(test_processed$TARGET), positive = "1")
-cm_log2
-cm_log2$byClass["Sensitivity"]
+s <- seq(from = .05, to = .8, by = .01)
+results <- data.frame(k = s, total = NA)
+for (i in seq_along(s)) {
+  log_p <- ifelse(default_pred_log >= s[i], 1, 0)
+  cm <- confusionMatrix(as.factor(log_p), as.factor(test_processed$TARGET), positive = "1")
+  
+  results$total[i] <- cm$byClass['Specificity'] * 1 + cm$byClass['Sensitivity'] * 3
+}
+best_thresh <- results$k[which.max(results$total)]
+plot(s, results$total, type = "l", xlab = "Threshold", ylab = "3 * Sens + 1 * Spec", main = "Score vs Threshold")
+abline(v = best_thresh, col = "red", lwd = 2)
+
+default_pred_log1 <- ifelse(default_pred_log >= best_thresh, 1, 0)
+cm_log <- confusionMatrix(as.factor(default_pred_log1), as.factor(test_processed$TARGET), positive = "1")
+cm_log
+cm_log$byClass["Sensitivity"]
 
 cat("We also try using a lasso model, this is a different way of performing model selection. We can observe which performs better\n")
 x <- model.matrix(TARGET ~ ., data = train_base)[, -1]
@@ -46,7 +58,19 @@ cm_logL
 cm_logL$byClass["Sensitivity"]
 cat("Again, with a baseline threshold of .5, we see a poor sensitivity of", cm_log$byClass["Sensitivity"],"but, we will try lowering the threshold\n")
 
-def_pred_log_L <- ifelse(def_pred_logL >= .05, 1, 0)
+s <- seq(from = .05, to = .8, by = .01)
+results <- data.frame(k = s, total = NA)
+for (i in seq_along(s)) {
+  las_p <- ifelse(def_pred_logL >= s[i], 1, 0)
+  cm <- confusionMatrix(as.factor(las_p), as.factor(test_processed$TARGET), positive = "1")
+  
+  results$total[i] <- cm$byClass['Specificity'] * 1 + cm$byClass['Sensitivity'] * 3
+}
+best_thresh <- results$k[which.max(results$total)]
+plot(s, results$total, type = "l", xlab = "Threshold", ylab = "3 * Sens + 1 * Spec", main = "Score vs Threshold")
+abline(v = best_thresh, col = "red", lwd = 2)
+
+def_pred_log_L <- ifelse(def_pred_logL >= best_thresh, 1, 0)
 cm_logL <- confusionMatrix(as.factor(def_pred_log_L), as.factor(test_processed$TARGET), positive = "1")
 cm_logL
 cm_logL$byClass["Sensitivity"]
