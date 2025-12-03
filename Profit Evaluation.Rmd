@@ -10,15 +10,16 @@ In this profit evaluation, we use the following:
 
 ```{r}
 profit <- c()
-people <- 1000
-final_prof <- people * (final_cm2$table[2, 2] * 125000 - final_cm2$table[1, 2] * 150000 - final_cm2$table[2, 1] * 10000 + final_cm2$table[1, 1] * 5000) / sum(final_cm2$table)
-log_prof <- people * (cm_log$table[2, 2] * 125000 - cm_log$table[1, 2] * 150000 - cm_log$table[2, 1] * 10000 + cm_log$table[1, 1] * 5000) / sum(cm_log$table)
-las_prof <- people * (cm_logL$table[2, 2] * 125000 - cm_logL$table[1, 2] * 150000 - cm_logL$table[2, 1] * 10000 + cm_logL$table[1, 1] * 5000) / sum(cm_logL$table)
-knn_prof <- people * (cm_knn$table[2, 2] * 125000 - cm_knn$table[1, 2] * 150000 - cm_knn$table[2, 1] * 10000 + cm_knn$table[1, 1] * 5000) / sum(cm_knn$table)
-ann_prof <- people * (cm_ann$table[2, 2] * 125000 - cm_ann$table[1, 2] * 150000 - cm_ann$table[2, 1] * 10000 + cm_ann$table[1, 1] * 5000) / sum(cm_ann$table)
-dt_prof <- people * (cm_tree$table[2, 2] * 125000 - cm_tree$table[1, 2] * 150000 - cm_tree$table[2, 1] * 10000 + cm_tree$table[1, 1] * 5000) / sum(cm_tree$table)
-rf_prof <- people * (cm_rf$table[2, 2] * 125000 - cm_rf$table[1, 2] * 150000 - cm_rf$table[2, 1] * 10000 + cm_rf$table[1, 1] * 5000) / sum(cm_rf$table)
-svm_prof <- people * (cm_svm$table[2, 2] * 125000 - cm_svm$table[1, 2] * 150000 - cm_svm$table[2, 1] * 10000 + cm_svm$table[1, 1] * 5000) / sum(cm_svm$table)
+people <- 10000
+
+final_prof <- people * (final_cm2$table[2, 2] * 170000 - final_cm2$table[1, 2] * 185000 - final_cm2$table[2, 1] * 12000 + final_cm2$table[1, 1] * 8000) / sum(final_cm2$table)
+log_prof <- people * (cm_log$table[2, 2] * 170000 - cm_log$table[1, 2] * 185000 - cm_log$table[2, 1] * 12000 + cm_log$table[1, 1] * 8000) / sum(cm_log$table)
+las_prof <- people * (cm_logL$table[2, 2] * 170000 - cm_logL$table[1, 2] * 185000 - cm_logL$table[2, 1] * 12000 + cm_logL$table[1, 1] * 8000) / sum(cm_logL$table)
+knn_prof <- people * (cm_knn$table[2, 2] * 170000 - cm_knn$table[1, 2] * 185000 - cm_knn$table[2, 1] * 12000 + cm_knn$table[1, 1] * 8000) / sum(cm_knn$table)
+ann_prof <- people * (cm_ann$table[2, 2] * 170000 - cm_ann$table[1, 2] * 185000 - cm_ann$table[2, 1] * 12000 + cm_ann$table[1, 1] * 8000) / sum(cm_ann$table)
+dt_prof <- people * (cm_tree$table[2, 2] * 170000 - cm_tree$table[1, 2] * 185000 - cm_tree$table[2, 1] * 12000 + cm_tree$table[1, 1] * 8000) / sum(cm_tree$table)
+rf_prof <- people * (cm_rf$table[2, 2] * 170000 - cm_rf$table[1, 2] * 185000 - cm_rf$table[2, 1] * 12000 + cm_rf$table[1, 1] * 8000) / sum(cm_rf$table)
+svm_prof <- people * (cm_svm$table[2, 2] * 170000 - cm_svm$table[1, 2] * 185000 - cm_svm$table[2, 1] * 12000 + cm_svm$table[1, 1] * 8000) / sum(cm_svm$table)
 profit <- c(final_prof, log_prof, las_prof, knn_prof, ann_prof, dt_prof, rf_prof, svm_prof)
 names <- c("Final", "Logistic", "LASSO", "KNN", "ANN", "DT", "RF", "SVM")
 names(profit) <- names 
@@ -31,7 +32,7 @@ bp <- barplot(profit,
         ylab = "Profit",
         xlab = "Model",
         col = colors,
-        ylim = c(min(profit) * 1.1, max(profit) * 1.35))
+        ylim = c(min(profit) * 1.1, max(profit) * 1.5))
 
 text(
   x = bp,                 

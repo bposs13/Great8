@@ -7,7 +7,6 @@ mortgage <- read.csv("application_train.csv", stringsAsFactors = TRUE)
 set.seed(12345)
 rows <- sample(1:nrow(mortgage), 10000)
 dat <- mortgage[rows, ]
-
 dat$TARGET <- factor(dat$TARGET)
 ```
 
